@@ -40,6 +40,11 @@ class PluginService:
         return result
 
     @staticmethod
+    async def changed() -> str | None:
+        """插件状态是否变更"""
+        return await redis_client.get(f'{settings.PLUGIN_REDIS_PREFIX}:changed')
+
+    @staticmethod
     async def install_zip(*, file: UploadFile) -> None:
         """
         通过 zip 压缩包安装插件
@@ -89,6 +94,7 @@ class PluginService:
             zf.extractall(os.path.join(PLUGIN_DIR, plugin_name), members)
 
         await install_requirements_async(plugin_name)
+        await redis_client.set(f'{settings.PLUGIN_REDIS_PREFIX}:changed', 'ture')
 
     @staticmethod
     async def install_git(*, repo_url: str):
@@ -112,6 +118,7 @@ class PluginService:
             raise errors.ServerError(msg='插件安装失败，请稍后重试') from e
         else:
             await install_requirements_async(repo_name)
+        await redis_client.set(f'{settings.PLUGIN_REDIS_PREFIX}:changed', 'ture')
 
     @staticmethod
     async def uninstall(*, plugin: str):
@@ -127,6 +134,9 @@ class PluginService:
         await uninstall_requirements_async(plugin)
         bacup_dir = os.path.join(PLUGIN_DIR, f'{plugin}.{timezone.now().strftime("%Y%m%d%H%M%S")}.backup')
         shutil.move(plugin_dir, bacup_dir)
+        await redis_client.delete(f'{settings.PLUGIN_REDIS_PREFIX}:info:{plugin}')
+        await redis_client.hdel(f'{settings.PLUGIN_REDIS_PREFIX}:status', plugin)
+        await redis_client.set(f'{settings.PLUGIN_REDIS_PREFIX}:changed', 'ture')
 
     @staticmethod
     async def update_status(*, plugin: str):
@@ -140,12 +150,14 @@ class PluginService:
         if not plugin_info:
             raise errors.ForbiddenError(msg='插件不存在')
         plugin_info = json.loads(plugin_info)
+
+        # 更新持久缓存状态
         new_status = (
             StatusType.enable.value
             if plugin_info.get('plugin', {}).get('enable') == StatusType.disable.value
             else StatusType.disable.value
         )
-        plugin_info['plugin']['enable'] = new_status
+        plugin_info['plugin']['enable'] = str(new_status)
         await redis_client.set(
             f'{settings.PLUGIN_REDIS_PREFIX}:info:{plugin}', json.dumps(plugin_info, ensure_ascii=False)
         )

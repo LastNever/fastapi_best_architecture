@@ -22,6 +22,12 @@ async def get_all_plugins() -> ResponseSchemaModel[list[dict[str, Any]]]:
     return response_base.success(data=plugins)
 
 
+@router.get('/changed', summary='插件状态是否变更', dependencies=[DependsJwtAuth])
+async def plugin_changed() -> ResponseSchemaModel[bool]:
+    plugins = await plugin_service.changed()
+    return response_base.success(data=bool(plugins))
+
+
 @router.post(
     '/install/zip',
     summary='安装 zip 插件',
