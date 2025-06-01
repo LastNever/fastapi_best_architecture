@@ -56,6 +56,14 @@ async def filter_data_permission(db: AsyncSession, request: Request) -> ColumnEl
     :param request: FastAPI 请求对象
     :return:
     """
+    # 是否过滤数据权限
+    if request.user.is_superuser:
+        return or_(1 == 1)
+
+    for role in request.user.roles:
+        if not role.is_filter_scopes:
+            return or_(1 == 1)
+
     # 获取数据范围
     unique_data_scopes = {}
     for role in request.user.roles:
@@ -66,8 +74,8 @@ async def filter_data_permission(db: AsyncSession, request: Request) -> ColumnEl
     # 转换为列表
     data_scopes = list(unique_data_scopes.values())
 
-    # 超级管理员和无规则用户不做过滤
-    if request.user.is_superuser or not data_scopes:
+    # 无规则用户不做过滤
+    if not data_scopes:
         return or_(1 == 1)
 
     # 获取数据范围规则
