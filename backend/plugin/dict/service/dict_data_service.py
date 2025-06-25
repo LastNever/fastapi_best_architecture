@@ -24,7 +24,7 @@ class DictDataService:
         :return:
         """
         async with async_db_session() as db:
-            dict_data = await dict_data_dao.get_with_relation(db, pk)
+            dict_data = await dict_data_dao.get(db, pk)
             if not dict_data:
                 raise errors.NotFoundError(msg='字典数据不存在')
             return dict_data
@@ -36,16 +36,22 @@ class DictDataService:
             return dict_datas
 
     @staticmethod
-    async def get_select(*, label: str | None, value: str | None, status: int | None) -> Select:
+    async def get_select(
+        *, type_code: str | None, label: str | None, value: str | None, status: int | None, type_id: int | None
+    ) -> Select:
         """
         获取字典数据列表查询条件
 
+        :param type_code: 字典类型编码
         :param label: 字典数据标签
         :param value: 字典数据键值
         :param status: 状态
+        :param type_id: 字典类型 ID
         :return:
         """
-        return await dict_data_dao.get_list(label=label, value=value, status=status)
+        return await dict_data_dao.get_list(
+            type_code=type_code, label=label, value=value, status=status, type_id=type_id
+        )
 
     @staticmethod
     async def create(*, obj: CreateDictDataParam) -> None:
@@ -62,7 +68,7 @@ class DictDataService:
             dict_type = await dict_type_dao.get(db, obj.type_id)
             if not dict_type:
                 raise errors.NotFoundError(msg='字典类型不存在')
-            await dict_data_dao.create(db, obj)
+            await dict_data_dao.create(db, obj, dict_type.code)
 
     @staticmethod
     async def update(*, pk: int, obj: UpdateDictDataParam) -> int:
@@ -83,7 +89,7 @@ class DictDataService:
             dict_type = await dict_type_dao.get(db, obj.type_id)
             if not dict_type:
                 raise errors.NotFoundError(msg='字典类型不存在')
-            count = await dict_data_dao.update(db, pk, obj)
+            count = await dict_data_dao.update(db, pk, obj, dict_type.code)
             return count
 
     @staticmethod
